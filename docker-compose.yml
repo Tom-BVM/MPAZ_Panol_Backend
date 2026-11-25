@@ -1,0 +1,70 @@
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: mpaz-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: mpaz_user
+      MYSQL_PASSWORD: mpaz_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mpaz-net
+
+  users-service:
+    build: ./MicroservicioUser
+    container_name: mpaz-users-service
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      SPRING_APPLICATION_NAME: users-service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/mpaz_users_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Santiago
+      SPRING_DATASOURCE_USERNAME: mpaz_user
+      SPRING_DATASOURCE_PASSWORD: mpaz_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - mpaz-net
+
+  inventory-service:
+    build: ./MicroservicioInventory
+    container_name: mpaz-inventory-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - mpaz-net
+
+  reservations-service:
+    build: ./MicroservicioReservas
+    container_name: mpaz-reservations-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+    restart: on-failure
+    networks:
+      - mpaz-net
+
+volumes:
+  mysql_data:
+
+networks:
+  mpaz-net:
